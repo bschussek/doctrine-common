@@ -320,22 +320,26 @@ class Parser
             $this->match(Lexer::T_COMMA);
             $value = $this->Value();
 
-            if ( ! is_array($value)) {
+            if ( ! is_array($value) && ! is_object($value)) {
                 $this->syntaxError('Value', $value);
             }
 
             $values[] = $value;
         }
 
+        $stringIndices = false;
+
         foreach ($values as $k => $value) {
             if (is_array($value) && is_string(key($value))) {
+                $stringIndices = true;
+                unset($values[$k]);
                 $key = key($value);
                 $values[$key] = $value[$key];
-            } else {
-                $values['value'] = $value;
             }
+        }
 
-            unset($values[$k]);
+        if ( ! $stringIndices) {
+            $values = array('value' => $values);
         }
 
         return $values;
