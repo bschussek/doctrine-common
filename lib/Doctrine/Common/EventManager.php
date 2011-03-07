@@ -41,11 +41,29 @@ class EventManager
 {
     /**
      * Map of registered listeners.
-     * <event> => <listeners>
+     * <event> => (<objecthash> => <listener>)
      *
      * @var array
      */
     private $_listeners = array();
+
+    /**
+     * Map of priorities by the object hashes of their listeners.
+     * <event> => (<objecthash> => <priority>)
+     *
+     * This property is used for listener sorting.
+     *
+     * @var array
+     */
+    private $_priorities = array();
+
+    /**
+     * Stores which event listener lists are currently sorted.
+     * <event> => <sorted>
+     *
+     * @var array
+     */
+    private $_sorted = array();
 
     /**
      * Dispatches an event to all registered listeners.
@@ -58,7 +76,9 @@ class EventManager
     public function dispatchEvent($eventName, EventArgs $eventArgs = null)
     {
         if (isset($this->_listeners[$eventName])) {
-            $eventArgs = $eventArgs === null ? EventArgs::getEmptyInstance() : $eventArgs;
+            $eventArgs = $eventArgs === null ? new EventArgs() : $eventArgs;
+
+            $this->sortListeners($eventName);
 
             foreach ($this->_listeners[$eventName] as $listener) {
                 $this->triggerListener($listener, $eventName, $eventArgs);
@@ -91,6 +111,28 @@ class EventManager
     }
 
     /**
+     * Sorts the internal list of listeners for the given event by priority.
+     *
+     * Calling this method multiple times will not cause overhead unless you
+     * add new listeners. As long as no listener is added, the list for an
+     * event name won't be sorted twice.
+     *
+     * @param string $event The name of the event.
+     */
+    private function sortListeners($eventName)
+    {
+        if (!$this->_sorted[$eventName]) {
+            $p = $this->_priorities[$eventName];
+
+            uasort($this->_listeners[$eventName], function ($a, $b) use ($p) {
+                return $p[spl_object_hash($b)] - $p[spl_object_hash($a)];
+            });
+
+            $this->_sorted[$eventName] = true;
+        }
+    }
+
+    /**
      * Gets the listeners of a specific event or all listeners.
      *
      * @param string $event The name of the event.
@@ -98,7 +140,17 @@ class EventManager
      */
     public function getListeners($event = null)
     {
-        return $event ? $this->_listeners[$event] : $this->_listeners;
+        if ($event) {
+            $this->sortListeners($event);
+
+            return $this->_listeners[$event];
+        }
+
+        foreach ($this->_listeners as $event => $listeners) {
+            $this->sortListeners($event);
+        }
+
+        return $this->_listeners;
     }
 
     /**
@@ -117,16 +169,24 @@ class EventManager
      *
      * @param string|array $events The event(s) to listen on.
      * @param object $listener The listener object.
+     * @param integer $priority The higher this value, the earlier an event listener
+     *                          will be triggered in the chain. Defaults to 0.
      */
-    public function addEventListener($events, $listener)
+    public function addEventListener($events, $listener, $priority = 0)
     {
         // Picks the hash code related to that listener
         $hash = spl_object_hash($listener);
 
         foreach ((array) $events as $event) {
-            // Overrides listener if a previous one was associated already
+            if (!isset($this->_listeners[$event])) {
+                $this->_listeners[$event] = array();
+                $this->_priorities[$event] = array();
+            }
+
             // Prevents duplicate listeners on same event (same instance only)
             $this->_listeners[$event][$hash] = $listener;
+            $this->_priorities[$event][$hash] = $priority;
+            $this->_sorted[$event] = false;
         }
     }
 
@@ -145,6 +205,7 @@ class EventManager
             // Check if actually have this listener associated
             if (isset($this->_listeners[$event][$hash])) {
                 unset($this->_listeners[$event][$hash]);
+                unset($this->_priorities[$event][$hash]);
             }
         }
     }
@@ -154,9 +215,11 @@ class EventManager
      * interested in and added as a listener for these events.
      *
      * @param Doctrine\Common\EventSubscriber $subscriber The subscriber.
+     * @param integer $priority The higher this value, the earlier an event listener
+     *                          will be triggered in the chain. Defaults to 0.
      */
-    public function addEventSubscriber(EventSubscriber $subscriber)
+    public function addEventSubscriber(EventSubscriber $subscriber, $priority = 0)
     {
-        $this->addEventListener($subscriber->getSubscribedEvents(), $subscriber);
+        $this->addEventListener($subscriber->getSubscribedEvents(), $subscriber, $priority);
     }
 }

@@ -42,6 +42,57 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
         $this->assertEquals(2, count($this->_eventManager->getListeners()));
     }
 
+    public function testGetListenersSortsByPriority()
+    {
+        $listener1 = new TestEventListener();
+        $listener2 = new TestEventListener();
+        $listener3 = new TestEventListener();
+
+        $this->_eventManager->addEventListener('preFoo', $listener1, -10);
+        $this->_eventManager->addEventListener('preFoo', $listener2);
+        $this->_eventManager->addEventListener('preFoo', $listener3, 10);
+
+        $expected = array(
+            spl_object_hash($listener3) => $listener3,
+            spl_object_hash($listener2) => $listener2,
+            spl_object_hash($listener1) => $listener1,
+        );
+
+        $this->assertSame($expected, $this->_eventManager->getListeners('preFoo'));
+    }
+
+    public function testGetAllListenersSortsByPriority()
+    {
+        $listener1 = new TestEventListener();
+        $listener2 = new TestEventListener();
+        $listener3 = new TestEventListener();
+        $listener4 = new TestEventListener();
+        $listener5 = new TestEventListener();
+        $listener6 = new TestEventListener();
+
+        $this->_eventManager->addEventListener('preFoo', $listener1, -10);
+        $this->_eventManager->addEventListener('preFoo', $listener2);
+        $this->_eventManager->addEventListener('preFoo', $listener3, 10);
+        $this->_eventManager->addEventListener('postFoo', $listener4, -10);
+        $this->_eventManager->addEventListener('postFoo', $listener5);
+        $this->_eventManager->addEventListener('postFoo', $listener6, 10);
+
+        $expected = array(
+            'preFoo' => array(
+                spl_object_hash($listener3) => $listener3,
+                spl_object_hash($listener2) => $listener2,
+                spl_object_hash($listener1) => $listener1,
+             ),
+            'postFoo' => array(
+                spl_object_hash($listener6) => $listener6,
+                spl_object_hash($listener5) => $listener5,
+                spl_object_hash($listener4) => $listener4,
+             ),
+        );
+
+        $this->assertSame($expected, $this->_eventManager->getListeners());
+    }
+
     public function testDispatchEvent()
     {
         $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $this->_listener);
@@ -67,11 +118,31 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
 
         // postFoo() stops the propagation, so only one listener should
         // be executed
-        $this->_eventManager->addEventListener('postFoo', $this->_listener);
+        // Manually set priority to enforce $this->_listener to be called first
+        $this->_eventManager->addEventListener('postFoo', $this->_listener, 10);
         $this->_eventManager->addEventListener('postFoo', $otherListener);
         $this->_eventManager->dispatchEvent(self::postFoo);
         $this->assertTrue($this->_listener->postFooInvoked);
         $this->assertFalse($otherListener->postFooInvoked);
+    }
+
+    public function testDispatchByPriority()
+    {
+        $invoked = array();
+        $listener1 = function () use (&$invoked) {
+            $invoked[] = '1';
+        };
+        $listener2 = function () use (&$invoked) {
+            $invoked[] = '2';
+        };
+        $listener3 = function () use (&$invoked) {
+            $invoked[] = '3';
+        };
+        $this->_eventManager->addEventListener('preFoo', $listener1, -10);
+        $this->_eventManager->addEventListener('preFoo', $listener2);
+        $this->_eventManager->addEventListener('preFoo', $listener3, 10);
+        $this->_eventManager->dispatchEvent(self::preFoo);
+        $this->assertEquals(array('3', '2', '1'), $invoked);
     }
 
     public function testRemoveEventListener()
