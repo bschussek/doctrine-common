@@ -52,6 +52,17 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
         $this->assertFalse($this->_postFooInvoked);
     }
 
+    public function testDispatchEventForClosure()
+    {
+        $invoked = 0;
+        $listener = function () use (&$invoked) {
+            $invoked++;
+        };
+        $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $listener);
+        $this->_eventManager->dispatchEvent(self::preFoo);
+        $this->assertEquals(1, $invoked);
+    }
+
     public function testRemoveEventListener()
     {
         $this->_eventManager->addEventListener(array('preBar'), $this);

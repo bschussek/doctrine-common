@@ -79,7 +79,11 @@ class EventManager
      */
     protected function triggerListener($listener, $eventName, EventArgs $eventArgs)
     {
-        $listener->$eventName($eventArgs);
+        if ($listener instanceof \Closure) {
+            $listener->__invoke($eventArgs);
+        } else {
+            $listener->$eventName($eventArgs);
+        }
     }
 
     /**
