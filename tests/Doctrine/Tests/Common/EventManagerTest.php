@@ -184,7 +184,7 @@ class TestEventListener
 
 class TestEventSubscriber implements \Doctrine\Common\EventSubscriber
 {
-    public function getSubscribedEvents()
+    public static function getSubscribedEvents()
     {
         return array('preFoo', 'postFoo');
     }
