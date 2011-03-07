@@ -62,6 +62,10 @@ class EventManager
 
             foreach ($this->_listeners[$eventName] as $listener) {
                 $this->triggerListener($listener, $eventName, $eventArgs);
+
+                if ($eventArgs->isPropagationStopped()) {
+                    break;
+                }
             }
         }
     }

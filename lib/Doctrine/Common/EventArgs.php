@@ -25,8 +25,10 @@ namespace Doctrine\Common;
  * EventArgs is the base class for classes containing event data.
  *
  * This class contains no event data. It is used by events that do not pass state
- * information to an event handler when an event is raised. The single empty EventArgs
- * instance can be obtained through {@link getEmptyInstance}.
+ * information to an event handler when an event is raised.
+ *
+ * You can call the method stopPropagation() to abort the execution of
+ * further listeners in your event listener.
  *
  * @license http://www.opensource.org/licenses/lgpl-license.php LGPL
  * @link    www.doctrine-project.org
@@ -35,35 +37,35 @@ namespace Doctrine\Common;
  * @author  Guilherme Blanco <guilhermeblanco@hotmail.com>
  * @author  Jonathan Wage <jonwage@gmail.com>
  * @author  Roman Borschel <roman@code-factory.org>
+ * @author  Bernhard Schussek <bschussek@gmail.com>
  */
 class EventArgs
 {
     /**
-     * @var EventArgs Single instance of EventArgs
-     * @static
+     * @var boolean Whether no further event listeners should be triggered
      */
-    private static $_emptyEventArgsInstance;
+    private $_propagationStopped = false;
 
     /**
-     * Gets the single, empty and immutable EventArgs instance.
+     * Returns whether further event listeners should be triggered.
      *
-     * This instance will be used when events are dispatched without any parameter,
-     * like this: EventManager::dispatchEvent('eventname');
-     *
-     * The benefit from this is that only one empty instance is instantiated and shared
-     * (otherwise there would be instances for every dispatched in the abovementioned form)
-     *
-     * @see EventManager::dispatchEvent
-     * @link http://msdn.microsoft.com/en-us/library/system.eventargs.aspx
-     * @static
-     * @return EventArgs
+     * @see EventArgs::stopPropagation
+     * @return boolean
      */
-    public static function getEmptyInstance()
+    public function isPropagationStopped()
     {
-        if ( ! self::$_emptyEventArgsInstance) {
-            self::$_emptyEventArgsInstance = new EventArgs;
-        }
+        return $this->_propagationStopped;
+    }
 
-        return self::$_emptyEventArgsInstance;
+    /**
+     * Stops the propagation of the event to further event listeners.
+     *
+     * If multiple event listeners are connected to the same event, no
+     * further event listener will be triggered once any trigger calls
+     * stopPropagation().
+     */
+    public function stopPropagation()
+    {
+        $this->_propagationStopped = true;
     }
 }

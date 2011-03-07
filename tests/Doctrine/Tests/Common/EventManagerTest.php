@@ -15,16 +15,14 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
     const preBar = 'preBar';
     const postBar = 'postBar';
 
-    private $_preFooInvoked = false;
-    private $_postFooInvoked = false;
-
     private $_eventManager;
+
+    private $_listener;
 
     protected function setUp()
     {
         $this->_eventManager = new EventManager;
-        $this->_preFooInvoked = false;
-        $this->_postFooInvoked = false;
+        $this->_listener = new TestEventListener;
     }
 
     public function testInitialState()
@@ -36,7 +34,7 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
 
     public function testAddEventListener()
     {
-        $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $this);
+        $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $this->_listener);
         $this->assertTrue($this->_eventManager->hasListeners(self::preFoo));
         $this->assertTrue($this->_eventManager->hasListeners(self::postFoo));
         $this->assertEquals(1, count($this->_eventManager->getListeners(self::preFoo)));
@@ -46,10 +44,10 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
 
     public function testDispatchEvent()
     {
-        $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $this);
+        $this->_eventManager->addEventListener(array('preFoo', 'postFoo'), $this->_listener);
         $this->_eventManager->dispatchEvent(self::preFoo);
-        $this->assertTrue($this->_preFooInvoked);
-        $this->assertFalse($this->_postFooInvoked);
+        $this->assertTrue($this->_listener->preFooInvoked);
+        $this->assertFalse($this->_listener->postFooInvoked);
     }
 
     public function testDispatchEventForClosure()
@@ -63,11 +61,24 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
         $this->assertEquals(1, $invoked);
     }
 
+    public function testStopEventPropagation()
+    {
+        $otherListener = new TestEventListener;
+
+        // postFoo() stops the propagation, so only one listener should
+        // be executed
+        $this->_eventManager->addEventListener('postFoo', $this->_listener);
+        $this->_eventManager->addEventListener('postFoo', $otherListener);
+        $this->_eventManager->dispatchEvent(self::postFoo);
+        $this->assertTrue($this->_listener->postFooInvoked);
+        $this->assertFalse($otherListener->postFooInvoked);
+    }
+
     public function testRemoveEventListener()
     {
-        $this->_eventManager->addEventListener(array('preBar'), $this);
+        $this->_eventManager->addEventListener(array('preBar'), $this->_listener);
         $this->assertTrue($this->_eventManager->hasListeners(self::preBar));
-        $this->_eventManager->removeEventListener(array('preBar'), $this);
+        $this->_eventManager->removeEventListener(array('preBar'), $this->_listener);
         $this->assertFalse($this->_eventManager->hasListeners(self::preBar));
     }
 
@@ -78,17 +89,25 @@ class EventManagerTest extends \Doctrine\Tests\DoctrineTestCase
         $this->assertTrue($this->_eventManager->hasListeners(self::preFoo));
         $this->assertTrue($this->_eventManager->hasListeners(self::postFoo));
     }
+}
+
+class TestEventListener
+{
+    public $preFooInvoked = false;
+    public $postFooInvoked = false;
 
     /* Listener methods */
 
     public function preFoo(EventArgs $e)
     {
-        $this->_preFooInvoked = true;
+        $this->preFooInvoked = true;
     }
 
     public function postFoo(EventArgs $e)
     {
-        $this->_postFooInvoked = true;
+        $this->postFooInvoked = true;
+
+        $e->stopPropagation();
     }
 }
 
